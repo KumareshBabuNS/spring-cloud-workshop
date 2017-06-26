@@ -37,92 +37,21 @@ cf-demo-client ----{ http://demo/hi?name=Bob }--> cf-demo-app
                 <----{ `hello Bob` }-------------
 ```
 
-First we are going to get our 2 applications running locally. With our local Eureka server.
+First we are going to get our 2 applications running ~~locally~~. With our local Eureka server.
 And the second part of the lab is to push our 2 applications to PCF and use PCF Service Registry to register our applications rather than our standalone Eureka server.
 
 ### Set up
 
 1. You will need JDK 8, Maven and git. We will use the command line to launch the apps (`mvn spring-boot:run or java -jar`).
-2. git clone https://github.com/MarcialRosales/spring-cloud-workshop
-
-### Standalone Service Discovery
+2. git clone https://github.com/nagelpat/spring-cloud-workshop/
 
 Go to the folder, `labs/lab1` in the cloned git repo.
 
-1. Run eureka-server (from STS boot dashboard or from command line)
-2. Go to the eureka-server url. This is the default eureka-server URL if we don't specify any.
-`http://localhost:8761/`   
-3. Run cf-demo-app
-4. Check that our application registered with Eureka via the Eureka Dashboard.
-5. Check that our app works
-`curl localhost:8080/hello?name=Marcial`
-6. Run cf-demo-client
-7. Check that our application works, i.e. it automatically discover our demo app by its name and not by its url.
-
-  `curl localhost:8081/hi?name=Bob`
-
-  If we look at the source code `CfDemoClientApplication.ServiceInstanceRestController` we can see that we are using `http://demo/` as the base url when the real url is `http://localhost:8080`.
-  ```
-      ...
-     @RequestMapping("/hi")
-     public String hi(@RequestParam(defaultValue = "nobody") String name) {
-       return restTemplate.exchange("http://demo/hello?name={name}",
-         HttpMethod.GET, null,
-         String.class, name).getBody();
-
-     }
-     ...
-  ```
-
-  The magic is provided by the annotation `@LoadBalanced` applied to a `RestTemplate` bean.
-  ```
-      @Bean
-      @LoadBalanced   
-      public RestTemplate restTemplate() {
-      	return new RestTemplate();
-      }
-  ```
-  The RestTemplate bean will be intercepted and auto-configured by Spring Cloud to use a custom HttpRequestClient that uses Netflix Ribbon to do the application lookup. Ribbon is also a load-balancer so if you have multiple instances of a service available, it picks one for you.
-  The loadBalancer takes the logical service-name (as registered with the discovery-server) and converts it to the actual hostname of the chosen application.
-
-8. Check that our application can discover services using the `DiscoveryClient` api.
-
-  `curl localhost:8081/service-instances/demo | jq .`
-
-9. stop the cf-demo-app
-10. Check that it disappears from eureka but it is still visible to the client app.
-
-  `curl localhost:8081/service-instances/demo | jq .`
-
-  After 30 seconds it will disappear. This is because the client queries eureka every 30 seconds for a delta on what has happened since the last query.
-
-11. stop eureka server, check in the logs of the demo app exceptions. Start the eureka server, and see that the service is restored, run to check it out:
-
-  `curl localhost:8081/service-instances/demo | jq .`
-
-Bonus labs:
-- Run an additional instance of cf-demo-app (e.g. `mvn spring-boot:run -Dserver.port=9000`). Check Eureka dashboard and  `curl localhost:8081/service-instances/demo | jq .`. We should see 2 instances listed for DEMO app.
-- See the `instanceId` attribute of each instance in `curl localhost:8081/service-instances/demo | jq .`. See that both instances have the same value `DEMO`. We can configure each instance with a unique identifier:
-```
-eureka:
-  instance:
-    metadataMap:
-      instanceId: ${spring.application.name}:${spring.application.instance_id:${random.value}}
-```
-To run multiple instances of the same application (for load-balancing and resilience) they need to register with a unique id with the Registry Service. You will see that when we use Spring Cloud Connectors, Spring provides an unique identifier: `<appName>:<instanceIdentifier provided by PCF>`
-
-We know our application works, we can push it to the cloud.
-
 ### Service Discovery in the Cloud
-
-Note: Each attendee has its own account set up on this PCF foundation: https://apps.run-02.haas-40.pez.pivotal.io
 
 **Create Eureka or Service Registry in PCF**
 
-1. login
-`cf login -a https://api.run-02.haas-40.pez.pivotal.io --skip-ssl-validation`
-
-2. create service (http://docs.pivotal.io/spring-cloud-services/service-registry/creating-an-instance.html)
+1. create service (http://docs.pivotal.io/spring-cloud-services/service-registry/creating-an-instance.html)
 
   `cf marketplace -s p-service-registry`
 
@@ -132,18 +61,18 @@ Note: Each attendee has its own account set up on this PCF foundation: https://a
 
   Make sure the service is ready. PCF provisions the services asynchronously.
 
-3. Go to the AppsManager and check the service. Check out the dashboard.
+2. Go to the AppsManager and check the service. Check out the dashboard.
 
 **Deploy cf-demo-app in PCF**
 
-1. update manifest.yml (rename the host : eg. `yourname-cf-app-demo`, or `cf-app-demo-${random-word}`. )
-2. push the application (check out url, domain)
+1. check the manifest.yml (e.g. rename the host : `yourname-cf-app-demo`, or `cf-app-demo-${random-word}`. )
+2. push the dmeo application (check out url, domain) with the manifest.yml
 
   `cf push`
 
 3. Check the app is working
 
-  `curl cf-demo-app.cfapps-02.haas-40.pez.pivotal.io/hello?name=Marcial`
+  `curl https://URI/hello?name=Marcial`
 
 4. Check the credentials PCF has injected into our application
 
@@ -187,99 +116,17 @@ Note: Each attendee has its own account set up on this PCF foundation: https://a
 **Deploy cf-demo-client in PCF**
 
 1. install our client application
-2. update manifest.yml (host)
-3. push the application
+2. check the manifest.yml
+3. push the application with the manifest
 4. Check the app is working
-
-  `cf-demo-client.cfapps-02.haas-40.pez.pivotal.io/hi?name=Marcial`
+  `curl 'https://URI/hi?name=Marcial'`
+  
 5. Check that our app is not actually registered with Eureka however it has discovered our `demo` app. Also, see the instanceId shown in the Registry's dashboard.
 
 6. We can rely on RestTemplate to automatically resolve a service-name to a url. But we can also use the Discovery API to get their urls.
-`curl cf-demo-client.cfapps-02.haas-40.pez.pivotal.io/service-instances/demo | jq .`
+`curl https://URI-demo-client/service-instances/demo | jq .`
 
-
-### Eureka and dependency on Jersey 1.19. Path to Jersey 2.0.
-
-- New Features on Jersey 2.0. Spring Web/REST vs Jersey 2.
-- WIP eureka2 project based on Jersey 2.0 (https://github.com/Netflix/eureka/tree/master/eureka-client-jersey2)
-- We still have to remove Ribbon transitive dependency on Jersey 1.19. It should be possible to remove it given that it has pluggable transport but it is a big job though.
-- If we really want to leverage Netflix's load balancing capabilities the preferred path would be to keep working with Jersey 1 until Netflix updates all its stack to Jersey 2.
-
-
-## Zero-Downtime Deployments for Discoverable services   [Lab]
-
-We cannot register two PCF applications with the same `spring.application.name` against the same SCS `central-registry` service instance (but with different service's bindings or credentials) because according to SCS (1.1 and earlier) that is considered a security breached (i.e. another unexpected application is trying to register with the same name as another already registered application but using different credentials).
-
-To go around this issue, we cannot bind PCF applications (blue and green) to the service instance of the service-registry (`p-service-registry`) because that will automatically create a new set of credentials for each application.
-
-Instead, we need to ask the service instance -i.e. the `service-registry` from SCS- to provide us a credential and we create a `User Provided Service` with that credential. Once we have the `UPS` we can then bind that single `UPS` with our 2 applications, `green` and `blue`. That works because both instances, even though they are uniquely named in PCF they have the same `spring.application.name` used to register the app with Eureka and both apps are using the same credentials to talk to the `service-registry`, i.e. Eureka.
-
-Go to the folder, labs/lab3 in the cloned git repo.
-
-### Step by Step 1)
-1. Create a new manifest and modify the attribute 'name' and change it to `cf-demo-app-green` and push the app.
-2. It will fail because Eureka does not allow two PCF apps to register with Eureka using the same  `spring.application.name`.
-
-
-### Step by Step 2)
-1. Create a service instance of the service registry (skip this process if you already have a service instance)
-   <br>`cf create-service p-service-registry standard central-registry`
-2. Create a service key and call it `service-registry`
-  <br>`cf create-service-key central-registry service-registry`
-3. Read the actual key contained within the `service-registry` service key
-  <br>`cf service-key central-registry service-registry`
-  <br>It prints out something like this:
-
-  ```
-  Getting key service-registry for service instance central-registry as mrosales@pivotal.io...
-
-{
- "access_token_uri": "https://p-spring-cloud-services.uaa.run.haas-35.pez.pivotal.io/oauth/token",
- "client_id": "p-service-registry-ce80e383-0691-4a0e-a48e-84df7035cb2e",
- "client_secret": "XXXXXXXX",
- "uri": "https://eureka-c890fdd0-18b5-4c5b-bc44-89ef2383dc08.cfapps.haas-35.pez.pivotal.io"
-}
-```
-
-4. We have to create a `User Provided Service` with the credentials above. We will do that briefly.
-
-5. We need to create a custom `EurekaServiceInfoCreator` class that is able to recognize our new `User Provided Service` as an Eureka Service. For reference, a `ServiceInfoCreator` is a Java class of the `spring cloud service connectors` library which is able to create a `ServiceInfo` from a `VCAP_SERVICES` variable. There are many types of services, for instances, databases, messaging middleware, you name it. For each type of service, there is a `ServiceInfoCreator` class. The `connectors` library has a list of those `ServiceInfoCreator` classes. During the bootstrap process, the `connectors` library iterates over the list of services declared in the `VCAP_SERVICES` variable. For each service, the `connectors` library asks each `ServiceInfoCreator` if they recognize that service as of its type. For instance, the  `EurekaServiceInfoCreator` will look up the value `eureka` in the `tags` attribute of the service. If there is a match, the `connectors` library asks the `EurekaServiceInfoCreator` to create an `EurekaServiceInfo` instance which later on it is used to configure the `Eureka client`.
-
-We create a separate java project (`cf-demo-connectors`) for our custom `EurekaServiceInfoCreator` class so that we can bundle it with the `cf-demo-app` and `cf-demo-client` projects. Both applications will need to bind to the Eureka service therefore they need to find the eureka service in the `VCAP_SERVICES`.
-
-6. We need to create a new (text) file that the `connectors` library use to identify `ServiceInfoCreator` classes in the class-path. This file must be located under `src/main/resources/META-INF/services/org.springframework.cloud.cloudfoundry.CloudFoundryServiceInfoCreator`. We add the following line to the file: `io.pivotal.demo.EurekaServiceInfoCreator`. We put this file in the project we created for the `EurekaServiceInfoCreator`.
-
-
-7. Now we create a `User Provided Service` with the credentials above (Remember that we need to add our `label` attribute)
-  <br>`cf cups service-registry -p '{"access_token_uri": "https://p-spring-cloud-services.uaa.run.haas-35.pez.pivotal.io/oauth/token","client_id": "p-service-registry-ce80e383-0691-4a0e-a48e-84df7035cb2e","client_secret": "WGE829u3U7qt","uri": "https://eureka-c890fdd0-18b5-4c5b-bc44-89ef2383dc08.cfapps.haas-35.pez.pivotal.io", "label": "eureka"}'`
-
-
-8. Push your blue app : `cf push -f manifest.yml`
-```
-...
-applications:
-- name: cf-demo-app
-  services:
-  - service-registry
-...
-```
-
-9. Repeat the process with green app: `cf push -f manifest-green.yml`
-```
-...
-applications:
-- name: cf-demo-app-green
-  services:
-  - service-registry
-...
-```
-
-Both apps have `spring.application.name` equals to `demo`.
-
-10. Check Eureka dashboard has one entry for our `demo` service with 2 urls, one for blue and another for green.
-
-
-## 15:45 — 17:00 Configuration Management [Lecture]
+## Configuration Management [Lecture]
 
 [Slides](docs/SpringCloudConfigSlides.pdf)
 
@@ -290,13 +137,13 @@ Very interesting talk  [Implementing Config Server and Extending It](https://www
 - Spring Config Service (PCF Tile) does not support server-side decryption. Instead, we have to configure our client to do it. For that we need to make sure that the java buildpack is configured with `Java Cryptography Extension (JCE) Unlimited Strength policy files`. For further details check out the <a href="http://docs.pivotal.io/spring-cloud-services/config-server/writing-client-applications.html#use-client-side-decryption">docs</a>.
 - We should really use <a href="https://spring.io/blog/2016/06/24/managing-secrets-with-vault">Spring Cloud Vault</a> integrated with Spring Config Server to retrieve secrets.
 
-## 15:45 — 17:00 Configuration Management  [Lab]
+## Configuration Management  [Lab]
 Go to the folder, labs/lab2 in the cloned git repo.
 
-1. Check the config server in the market place
+1. Check the config server in the marketplace
 `cf marketplace -s p-config-server`
 2. Create a service instance
-`cf create-service -c '{"git": { "uri": "https://github.com/MarcialRosales/spring-cloud-workshop-config" }, "count": 1 }' p-config-server standard config-server`
+`cf create-service -c '{"git": { "uri": "https://github.com/nagelpat/spring-cloud-workshop-config" }, "count": 1 }' p-config-server standard config-server`
 
 3. Make sure the service is available (`cf services`)
 3. Modify our application so that it has a `bootstrap.yml` rather than `application.yml`. We don't really need an `application.yml`. If we have one, Spring Config client will take that as the default properties of the application.
@@ -457,93 +304,4 @@ spring:
       server:
         git:
           uri: file:../../{application}-repo
-```          
-
-## Zuul server [Lecture]
-
-- @EnableZuulProxy
-- It automatically (no configuration required) proxies all your services registered with Eureka thru a single entry point.
-e.g. When the zuul proxy receives this request http://localhost:8082/demo/hello?name=Marcial it automatically forwards this request to http://localhost:8080/hello?name=Marcial
-- We can configure Zuul to only allow certain services regardless of the services registered in Eureka. This is done thru simple configuration.
-- However, we can customize Zuul internal behaviour. Zuul borrows the Servlet Filters concept from the Servlet specification. Every request is passed thru a number of filters and eventually the request is forwarded to destination, or not. The filters allow us to intercept requests at different stages: before the request is routed, after we receive a response from the destination service. There are special type of filters which we can use to override the routing logic.
-
-### Build a Zuul server [Lab]
-
-The source code for this lab is available under `labs\lab4`. This lab relies on the previous lab3 artifacts, i.e. `cf-demo-app`, `eureka-server` (if you run it locally else Eureka from SCS) and `config-server` (if you run it locally else Config server from SCS). It also relies on the configuration file `demo-gateway.yml` in the configuration repository.
-
-1. To create a Zuul server we simply create one like this:
 ```
-@EnableZuulProxy
-@SpringBootApplication
-public class GatewayServiceApplication {
-
-	Map<String, Object> basicCache = new ConcurrentHashMap<>();
-
-	@Bean
-	public ZuulFilter histogramAccess(RouteLocator routeLocator, MetricRegistry metricRegistry) {
-		return new StatsCollector(routeLocator, metricRegistry);
-	}
-	public static void main(String[] args) {
-		SpringApplication.run(GatewayServiceApplication.class, args);
-	}
-}
-```
-2. We implement our own filter which keeps track of number of requests per service:
-```
-class StatsCollector extends ZuulFilter {
-
-	private static Logger log = LoggerFactory.getLogger(StatsCollector.class);
-	private MetricRegistry metrics;
-	private Map<String,String> serviceAliases = new HashMap<>();
-
-	public StatsCollector(RouteLocator routeLocator, MetricRegistry registry) {
-		super();
-		this.metrics = registry;
-		routeLocator.getRoutes().forEach(r -> {
-			String alias = aliasForService(r.getLocation());
-			serviceAliases.put(r.getLocation(), alias);
-			metrics.counter(alias);			
-		});
-	}
-	private String aliasForService(String name) {
-		return String.format("metrics.%s.requestCount", name);
-	}
-
-	@Override
-	public boolean shouldFilter() {
-		return true;
-	}
-
-	@Override
-	public int filterOrder() {
-		return 10;
-	}
-
-	@Override
-	public String filterType() {
-		return "pre";
-	}
-
-	@Override
-	public Object run() {
-		RequestContext ctx = RequestContext.getCurrentContext();
-
-		metrics.counter(serviceAliases.get((String)ctx.get("serviceId"))).inc();
-
-		return null;
-	}
-
-}
-```
-
-3. And we configure it so that all requests must be prefixed with `/api`. Also we want to disable every service registered with Eureka except our `cf-demo-app`. We can use a different name for our service in the URL. Instead of  `/api/demo/` but use `/api/demo-service`.
-```
-
-zuul:
-  prefix: /api
-  ignored-services: '*'
-  routes:
-    demo: /demo-service/**
-```    
-
-4. Invoke the service several times (eg. `http://localhost:8082/api/demo-service/hello?name=Bob`) and check the metrics using the metrics endpoint `http://localhost:8082/metrics | jq '.["metrics.demo.requestCount"]' `.
