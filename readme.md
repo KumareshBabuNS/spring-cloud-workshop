@@ -150,33 +150,32 @@ Go to the folder, labs/lab2 in the cloned git repo.
 
 4. Our repo has already our `demo.yml`. If we did not have our the setting `spring.application.name`, the `spring-auto-configuration` jar injected by the java buildpack will automatically create a `spring.application.name` environment variable based on the env variable `VCAP_APPLICATION { ... "application_name": "cf-demo-app" ... }`.
 
-5. Push our `cf-demo-app`.
+5. Change to `cf-demo-app` folder, do a `mvn install` and push the app with the `manifest.yml`.
 
 6. Check that our application is now bound to the config server
 `cf env cf-demo-app`
 
 7. Check that it loaded the application's configuration from the config server.
-`curl cf-demo-app.cfapps-02.haas-40.pez.pivotal.io/env | jq .`
+`curl https://demo-app-uri/env | jq .`
 
 We should have these configuration at the top :
 ```
-"configService:https://github.com/MarcialRosales/spring-cloud-workshop-config/demo.yml": {
+"configService:https://github.com/nagelpat/spring-cloud-workshop-config/demo.yml": {
     "mymessage": "Good afternoon"
   },
-  "configService:https://github.com/MarcialRosales/spring-cloud-workshop-config/application.yml": {
+  "configService:https://github.com/nagelpat/spring-cloud-workshop-config/application.yml": {
     "info.id": "${spring.application.name}"
   },
 ```  
 
 8. Check that our application is actually loading the message from the central config and not the default message `Hello`.
-`curl cf-demo-app.cfapps-02.haas-40.pez.pivotal.io/hello?name=Marcial`
+`curl 'https://demo-app-uri/hello?name=Marcial'`
 
 9. We can modify the demo.yml in github, and ask our application to reload the settings.
-`curl -X POST cf-demo-app.cfapps-02.haas-40.pez.pivotal.io/refresh`
+`curl -X POST https://demo-app-uri/refresh`
 
 Check the message again.
-`curl cf-demo-app.cfapps-02.haas-40.pez.pivotal.io/hello?name=Marcial`
-
+`curl 'https://demo-app-uri/hello?name=Marcial'`
 
 10. Add a new configuration for production : `demo-production.yml` to the repo.
 
@@ -186,7 +185,7 @@ Check the message again.
 we have to restage our application because we have modified the environment.
 
 12. Check our application returns us a different value this type
-`curl cf-demo-app.cfapps-02.haas-40.pez.pivotal.io/env | jq .`
+`curl https://demo-app-uri/env | jq .`
 
 We should have these configuration at the top :
 
